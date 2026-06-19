@@ -69,6 +69,8 @@ A scan-map of the merge strategies and helpers gandalf provides. Legend: ✅ sup
 
 SCD history strategies manage four control columns — `scd_start_dt`, `scd_end_dt`, `scd_is_current`, and `scd_checksum` — automatically. Point gandalf at a table that uses different names by passing `scd_columns=SCDColumns(is_current="current_flag", checksum="check_sum")`.
 
+> See **[COMPARISON.md](COMPARISON.md)** for how gandalf compares to other SCD libraries (mack, koheesio, hydro, fabricks, dbt, Databricks DLT…) — SCD-type coverage, test rigor (real-engine E2E / Spark / Databricks), and where gandalf is, and isn't, distinctive.
+
 ---
 
 ## What it does
