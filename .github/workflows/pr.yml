@@ -1,0 +1,35 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Disable shallow clone so SonarQube gets full history for blame / new-code detection.
+          fetch-depth: 0
+
+      # Build the Poetry image and run ruff + ruff format --check + pyrefly.
+      - name: Run lint, formatter, and type checks
+        run: docker compose up --build --exit-code-from lint-formatter lint-formatter
+
+      # Boots the Delta-enabled Spark Connect server (depends_on: service_healthy)
+      # and runs the pytest suite with coverage against it.
+      - name: Run integration tests (Spark Connect + Delta)
+        run: docker compose up --build --exit-code-from integration-tests integration-tests
+
+      # Code quality + coverage to SonarQube Cloud (reads sonar-project.properties).
+      # Secrets are not exposed to fork PRs, so skip there (SONAR_TOKEN would be empty).
+      - name: SonarQube Scan
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: SonarSource/sonarqube-scan-action@v8.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

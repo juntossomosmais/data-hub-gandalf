@@ -1,0 +1,26 @@
+# Delta-enabled Spark Connect server for gandalf's integration tests.
+#
+# WHY deltaio/delta-docker:4.0.0 (Spark 4.0.0 + Delta 4.0.0, Scala 2.13)?
+#   The Spark Connect server-side Delta plugin (io.delta:delta-connect-server_2.13) is only
+#   published at 4.0.0 on Maven Central — there is no 4.1.x / 4.2.x connect-server artifact.
+#   gandalf's client (spark-local group) is therefore pinned to delta-spark 4.0.0 to match.
+#
+# gandalf executes ONLY native Spark column expressions + the DeltaTable API, all of which
+# run as Connect plans / commands resolved server-side — no gandalf Python module is imported
+# in the server process, so (unlike the reference repo) there is no need to ship the package
+# or any user-defined-function artifact into this image.
+FROM deltaio/delta-docker:4.0.0
+
+USER root
+
+# Spark's `--packages` resolution needs a writable Ivy/HOME and predictable buffering.
+ENV HOME=/root
+ENV PYTHONUNBUFFERED=1
+
+# Self-contained copy of the start script (docker-compose also bind-mounts it so edits
+# don't require a rebuild).
+COPY ./scripts ./scripts/
+
+# Boots start-connect-server.sh with the Delta Connect plugin, writes "1" to the healthcheck
+# flag file once the server is up, then tails the log to keep the container alive.
+ENTRYPOINT ["./scripts/start-spark-connect-server.sh"]

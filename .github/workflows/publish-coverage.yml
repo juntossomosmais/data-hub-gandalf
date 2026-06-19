@@ -1,0 +1,42 @@
+name: Publish coverage report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gandalf/**'
+      - 'tests/**'
+      - 'Dockerfile'
+      - 'Dockerfile.spark-connect-server'
+      - 'docker-compose.yml'
+      - 'scripts/**'
+      - 'poetry.lock'
+      - 'pyproject.toml'
+      - '.github/workflows/publish-coverage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Disable shallow clone so SonarQube gets full history for blame / new-code detection.
+          fetch-depth: 0
+
+      - name: Execute lint/formatter
+        run: docker compose up --build --exit-code-from lint-formatter lint-formatter
+
+      - name: Execute tests
+        run: docker compose up --build --exit-code-from integration-tests integration-tests
+
+      # The integration-tests service bind-mounts the repo, so tests-reports/coverage.xml and
+      # junit.xml land on the runner workspace for the scan to ingest (reads sonar-project.properties).
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v8.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

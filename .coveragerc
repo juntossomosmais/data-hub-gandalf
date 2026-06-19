@@ -1,0 +1,18 @@
+[run]
+; Store file paths relative to the repo root. The suite runs inside the integration-tests
+; container (cwd /app), but the SonarCloud scan runs on the CI runner against the checkout —
+; absolute /app/gandalf/... paths don't reconcile with the runner's gandalf/... sources, so
+; coverage was being dropped (0.0% on new code). Relative paths map on both sides.
+relative_files = True
+
+; Limit coverage measurement to the library source.
+source =
+    gandalf
+
+omit =
+    */__pycache__/*
+
+[report]
+; https://coverage.readthedocs.io/en/latest/config.html#report
+show_missing = True
+skip_covered = False

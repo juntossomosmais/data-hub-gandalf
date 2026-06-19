@@ -1,0 +1,104 @@
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "data-hub-gandalf"
+# Placeholder. The publish workflow runs `poetry version $TAG_NAME` to set the real version from the git tag.
+version = "0.0.0"
+description = "A wizard's library for Databricks data tools and data protection — SCD2 merges, upsert, checksum, surrogate keys, schema validations, and guarded Delta writes. You shall not pass... bad data."
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { file = "LICENSE" }
+authors = [
+    { name = "Juntos Somos Mais", email = "no-reply@juntossomosmais.com.br" },
+]
+
+[project.urls]
+repository = "https://github.com/juntossomosmais/data-hub-gandalf"
+"Bug Tracker" = "https://github.com/juntossomosmais/data-hub-gandalf/issues"
+
+[tool.poetry]
+# Distribution name is data-hub-gandalf; the import package stays `gandalf`.
+packages = [{ include = "gandalf" }]
+
+[tool.poetry.dependencies]
+# Runtime dependencies are intentionally empty (only python): pyspark / delta-spark are
+# provided by the Databricks runtime (or the host Spark environment), so the published wheel
+# must NOT bundle them. The Spark stack lives in the dev group, for the test toolchain only.
+python = ">=3.12,<4.0"
+
+[tool.poetry.group.dev.dependencies]
+# The "connect" extra pulls the Spark Connect client deps (pandas, pyarrow, grpcio, ...),
+# which are required to talk to the Spark Connect server but are NOT installed by plain pyspark.
+pyspark = { version = "4.0.1", extras = ["connect"] }
+# Delta is pinned to the 4.0.0 line because the Spark Connect server-side plugin
+# (io.delta:delta-connect-server_2.13) is only published at 4.0.0 on Maven Central.
+# The client delta-spark must match the Connect server or Delta operations fail over Connect.
+delta-spark = "4.0.0"
+# pandas < 3.0: pyspark 4.0.1's pyspark.pandas (pulled in by pyspark.testing.utils'
+# assertDataFrameEqual) is not compatible with pandas 3.x, which the connect extra would
+# otherwise resolve to.
+pandas = ">=2.0,<3.0"
+pytest = ">=8.0"
+pytest-xdist = ">=3.0"
+pytest-cov = ">=5.0"
+coverage = "7.13.0"
+ruff = "^0.15.2"
+pyrefly = "~=0.64"
+taskipy = ">=1.13.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.taskipy.tasks]
+test = "pytest tests/"
+lint = "ruff check gandalf/ tests/"
+format = "ruff format gandalf/ tests/"
+format-check = "ruff format --check gandalf/ tests/"
+typecheck = "pyrefly check"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["scripts", ".github/workflows"]
+
+[tool.ruff.lint]
+select = [
+    "D",   # pydocstyle
+    "E",   # pycodestyle errors
+    "EXE", # flake8-executable
+    "F",   # pyflakes
+    "I",   # isort
+    "S",   # flake8-bandit
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
+ignore = [
+    "E501",   # line too long, the formatter handles this
+    "SIM117", # use a single `with` statement instead of nested `with`
+    "D1",     # missing docstrings
+    "D203",
+    "D212",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101", # asserts are the point of a test
+    "S108", # tmp storage paths in test fixtures are intentional
+    "D",    # tests don't follow docstring conventions
+]
+
+[tool.pyrefly.errors]
+bad-override-param-name = false
+
+[tool.pyrefly]
+python-version = "3.12"
+project-includes = ["gandalf"]
+project-excludes = [
+    "**/__pycache__",
+    "**/*venv/**",
+]
+check-unannotated-defs = false
+infer-return-types = "checked"
+permissive-ignores = true

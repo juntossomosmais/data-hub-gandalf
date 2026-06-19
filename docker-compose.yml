@@ -1,0 +1,65 @@
+# gandalf — local Spark Connect integration-test stack.
+#
+# Strategy: a Dockerized Spark Connect server,
+# driven entirely by Poetry (NOT requirements.txt). Supports BOTH the local Spark Connect path
+# (this compose) and the databricks-connect path (tests/conftest.py auto-selects: a Databricks
+# session when ~/.databricks creds exist, else a Spark Connect client at sc://CUSTOM_SPARK_REMOTE_HOST).
+#
+# Quick start:
+#   docker compose run --rm integration-tests          # full suite; coverage lands in ./tests-reports
+#   docker compose run --rm lint-formatter             # ruff + pyrefly
+#   docker compose down -v
+#
+# Inspect the server interactively:
+#   docker compose run --entrypoint bash --rm spark-connect-server
+
+services:
+  # Delta-enabled Spark Connect server on :15002. The integration-tests service waits for
+  # this to become healthy (the start script flips custom-is-server-up.txt to "1").
+  spark-connect-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark-connect-server
+    volumes:
+      - ./scripts/start-spark-connect-server.sh:/opt/spark/work-dir/scripts/start-spark-connect-server.sh
+    ports:
+      - "15002:15002" # Spark Connect gRPC endpoint
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'test -f /opt/spark/logs/custom-is-server-up.txt && [ "$(cat /opt/spark/logs/custom-is-server-up.txt)" = "1" ]',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+
+  # Full test suite (pytest + coverage). Talks to the Connect server via CUSTOM_SPARK_REMOTE_HOST,
+  # which tests/conftest.py consumes for its sc:// fallback. The repo is bind-mounted so the live
+  # source is tested and tests-reports/coverage.xml lands back on the host.
+  integration-tests:
+    build: .
+    environment:
+      CUSTOM_SPARK_REMOTE_HOST: "spark-connect-server:15002"
+      # Server-side path used by the storage-path (path_type="storage") tests. Resolved on the
+      # Connect server's filesystem; /tmp is writable and the container is ephemeral.
+      GANDALF_TEST_STORAGE_PATH: "/tmp/gandalf-it"
+      # To run the suite against YOUR OWN Databricks cluster instead of the shipped Spark Connect
+      # server, install databricks-connect in the image and pass standard Databricks auth, e.g.:
+      #   DATABRICKS_CONFIG_PROFILE: "my-profile"   # a profile in ~/.databrickscfg
+      # or DATABRICKS_HOST + DATABRICKS_CLUSTER_ID (token via your profile or DATABRICKS_TOKEN).
+      # No workspace or cluster identifier is hardcoded in this repo.
+    depends_on:
+      spark-connect-server:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: ["./scripts/start-tests.sh"]
+
+  # Lint + format + type check. Reuses the same Poetry image and gandalf's ruff + pyrefly config.
+  lint-formatter:
+    build: .
+    volumes:
+      - .:/app
+    command: ["./scripts/start-formatter-lint.sh"]
