@@ -1,5 +1,8 @@
 # Data Hub Gandalf
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=juntossomosmais_data-hub-gandalf&metric=coverage)](https://sonarcloud.io/summary/new_code?id=juntossomosmais_data-hub-gandalf)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=juntossomosmais_data-hub-gandalf&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=juntossomosmais_data-hub-gandalf)
+
 Python library for Databricks data pipelines — SCD Types 0/1/2/3/4/6, upserts, surrogate keys, checksums, and schema validations. You shall not pass... bad data.
 
 ## Installation
