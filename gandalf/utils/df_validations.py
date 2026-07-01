@@ -82,15 +82,19 @@ def column_check(
     """
     Compare source and target columns, reporting all divergences.
 
-    SCD control columns, SK columns (sk_*), and the explicit sk_name are excluded
-    from the target side before comparison. The CDC timestamp column is excluded
-    from the source side.
+    SCD control columns and the explicit sk_name are excluded from the target side
+    before comparison. Gandalf-generated SK columns (sk_*) are also excluded from
+    the target, but ONLY when they are absent from the source — these are surrogate
+    keys gandalf materializes into the target and the source never supplies. An sk_*
+    column present in BOTH source and target is a foreign key (e.g. a dimension SK
+    carried into a fact) and IS validated normally on both sides. The CDC timestamp
+    column is excluded from the source side.
 
     :param spark: SparkSession
     :param df: Source DataFrame
     :param path: Target Delta table path or catalog name
     :param path_type: 'storage' or 'table' (also accepts 'table_name')
-    :param sk_name: SK column name to exclude from target (auto-excluded via sk_* wildcard)
+    :param sk_name: SK column name to exclude from target
     :param create_part_col: Source column that will become a partition (exclude from check)
     :param part_name: Partition column name on target to exclude
     :param col_cdc_update_time: CDC timestamp column to exclude from source
@@ -105,11 +109,12 @@ def column_check(
 
     scd_control = set(scd_control_cols) if scd_control_cols is not None else set(SCDColumns().as_tuple())
     part_col_to_exclude = part_name if create_part_col else ""
+    # Only sk_* columns that gandalf generates into the target (absent from the source)
+    # are excluded. An sk_* present in the source too is a foreign key (e.g. a dim SK
+    # carried into a fact) and stays in the comparison so it is validated on both sides.
+    generated_sk_cols = {c for c in df_target.columns if c.startswith("sk_") and c not in df.columns}
     exclude_from_target = (
-        scd_control
-        | {sk_name, part_col_to_exclude}
-        | {c for c in df_target.columns if c.startswith("sk_")}
-        | (extra_target_exclude or set())
+        scd_control | {sk_name, part_col_to_exclude} | generated_sk_cols | (extra_target_exclude or set())
     )
     exclude_from_source = {col_cdc_update_time} if col_cdc_update_time else set()
 
