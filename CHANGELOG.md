@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `column_check` no longer reports a false `InvalidColumnsError` for a fact that carries a dimension surrogate key as a foreign key. The `sk_*` target-side exclusion was a wildcard that dropped every `sk_*` column from the target comparison, so an `sk_*` foreign key present in the source (but excluded from the target) was flagged as an extra source column. The exclusion is now scoped to gandalf-generated SKs only — `sk_*` columns absent from the source — restoring the original behavior where only the explicit `sk_name` was excluded. `sk_*` foreign keys present on both sides are validated normally (name and type); a source `sk_*` absent from the target is still reported.
+
 ## [0.1.0] - 2026-06-19
 
 ### Added

@@ -173,6 +173,64 @@ class TestColumnCheck(PySparkTestCase):
         # Act / Assert
         column_check(self.spark, df_source, self.path, "storage")
 
+    def test_sk_column_in_source_and_target_does_not_raise(self):
+        # Arrange
+        # An sk_* present on both sides is a foreign key (e.g. a dim SK carried into a
+        # fact): it must be validated as a normal column, not flagged as extra in source.
+        schema = StructType(
+            [
+                StructField("id", StringType()),
+                StructField("nome", StringType()),
+                StructField("sk_dim_qualidade", StringType()),
+            ]
+        )
+        self._write_target(self.spark, schema)
+        df_source = self.spark.createDataFrame([("1", "Alice", "hash123")], schema=schema)
+
+        # Act / Assert
+        column_check(self.spark, df_source, self.path, "storage")
+
+    def test_sk_column_only_in_source_raises_invalid_columns(self):
+        # Arrange
+        # sk_* present only in the source (absent from the target): guard preserved, must raise.
+        schema_target = StructType([StructField("id", StringType()), StructField("nome", StringType())])
+        self._write_target(self.spark, schema_target)
+        schema_source = StructType(
+            [
+                StructField("id", StringType()),
+                StructField("nome", StringType()),
+                StructField("sk_orfao", StringType()),
+            ]
+        )
+        df_source = self.spark.createDataFrame([("1", "Alice", "hash123")], schema=schema_source)
+
+        # Act / Assert
+        with self.assertRaises(InvalidColumnsError):
+            column_check(self.spark, df_source, self.path, "storage")
+
+    def test_shared_sk_column_with_type_mismatch_raises_invalid_columns(self):
+        # Arrange
+        # A shared sk_* (FK) on both sides is validated normally: a type divergence must
+        # be detected (it is no longer silently ignored).
+        schema_target = StructType(
+            [
+                StructField("id", StringType()),
+                StructField("sk_dim_qualidade", StringType()),
+            ]
+        )
+        self._write_target(self.spark, schema_target)
+        schema_source = StructType(
+            [
+                StructField("id", StringType()),
+                StructField("sk_dim_qualidade", IntegerType()),
+            ]
+        )
+        df_source = self.spark.createDataFrame([("1", 123)], schema=schema_source)
+
+        # Act / Assert
+        with self.assertRaises(InvalidColumnsError):
+            column_check(self.spark, df_source, self.path, "storage")
+
 
 class TestRowCount(PySparkTestCase):
     """Testes para row_count — valida contagem de linhas ativas após merge."""
